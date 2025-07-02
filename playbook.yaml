@@ -1,0 +1,115 @@
+---
+- name: practice_5
+  hosts: all_vms
+  become: true
+
+  vars:
+    #task 5_2
+    pkg_version: "17.0.15+6-1~deb12u1"
+
+    #task 5_3
+    custom_repository: "deb [arch=amd64] https://download.virtualbox.org/virtualbox/debian bookworm contrib"
+    custom_repository_key: "https://www.virtualbox.org/download/oracle_vbox_2016.asc"
+
+    #task 5_5
+    server_name: "example.com"
+    root_path: "/var/www/html"
+
+    #task 5_8
+    repos:
+      - repo: "https://github.com/rat9615/simple-nodejs-app"
+        dest: "/tmp/project1"
+      - repo: "https://github.com/rat9615/simple-nodejs-app"
+        dest: "/tmp/project2"
+      - repo: "https://github.com/rat9615/simple-nodejs-app"
+        dest: "/tmp/project3"
+  tasks:
+    - name: task_5_1
+      become: false
+      ansible.builtin.shell: 'echo "$(date) - $(whoami)" >> ~/info.txt'
+      args:
+        executable: /bin/bash
+
+    - name: task_5_2
+      ansible.builtin.apt:
+        name: openjdk-17-jdk={{ pkg_version }}
+        state: present
+        update_cache: yes
+
+    - name: task_5_3
+      block:
+        - name: Add custom repository key
+          ansible.builtin.apt_key:
+            url: "{{ custom_repository_key }}"
+            state: present
+        - name: Add custom repository
+          ansible.builtin.apt_repository:
+            repo: "{{ custom_repository }}"
+            state: present
+        - name: Install package from custom repository
+          ansible.builtin.apt:
+            name: virtualbox-7.0
+            update_cache: yes
+            state: present 
+
+    - name: task_5_4
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#Port'
+        insertafter: '^Port'
+        line: Port 2223
+
+    - name: task_5_5
+      block:
+        - name: Ensure destination directory exists
+          ansible.builtin.file:
+            path: /tmp/configs
+            state: directory
+        - name: Deploy nginx.conf from j2 template
+          ansible.builtin.template:
+            src: templates/nginx.conf.j2
+            dest: /tmp/configs/nginx.conf
+            backup: yes
+            
+    - name: task_5_6
+      ansible.builtin.get_url:
+        url: "https://templeos.org/Downloads/TempleOS.ISO"
+        dest: "/tmp/TempleOS.ISO"
+        mode: '0777'
+        force: no
+      register: download_result
+      until: download_result.failed == false
+      retries: 3
+      delay: 10
+
+    - name: task_5_7
+      ansible.builtin.cron:
+        name: "check ethernet connection"
+        minute: "1"
+        job: "ping 8.8.8.8"
+
+    - name: task_5_8
+      block:
+        - name: Install npm
+          ansible.builtin.apt:
+            name: npm
+            state: present
+            update_cache: yes
+        - name: Clone repositories
+          ansible.builtin.git:
+            repo: "{{ item.repo }}"
+            dest: "{{ item.dest }}"
+            clone: yes
+            update: yes
+            force: yes
+          loop: "{{ repos }}"
+        - name: Install dependencies
+          ansible.builtin.command: npm install
+          args:
+            chdir: "{{ item.dest }}"
+          loop: "{{ repos }}"
+    - name: task_5_9
+      ansible.builtin.systemd_service:
+        name: sshd
+        state: reloaded
+...
