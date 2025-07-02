@@ -2,8 +2,6 @@
 # vi: set ft=ruby :
 
 Vagrant.configure("2") do |config|
-  
-  shared_host_folder = "./shared"
 
   config.vm.define "machine1" do |machine1|
     machine1.vm.box = "generic/debian12"
@@ -20,6 +18,8 @@ Vagrant.configure("2") do |config|
     machine2.vm.hostname = "machine2"
     machine2.vm.network "private_network", ip: "192.168.56.11"
   end
+
+  config.vm.synced_folder ".", "/vagrant", disabled: true
 
   config.vm.provider "virtualbox" do |vb|
     vb.gui = true
